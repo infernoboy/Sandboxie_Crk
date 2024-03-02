@@ -79,6 +79,7 @@ void COptionsWindow::CreateAdvanced()
 	connect(ui.chkGuiTrace, SIGNAL(clicked(bool)), this, SLOT(OnAdvancedChanged()));
 	connect(ui.chkComTrace, SIGNAL(clicked(bool)), this, SLOT(OnAdvancedChanged()));
 	connect(ui.chkNetFwTrace, SIGNAL(clicked(bool)), this, SLOT(OnAdvancedChanged()));
+	connect(ui.chkHookTrace, SIGNAL(clicked(bool)), this, SLOT(OnAdvancedChanged()));
 	connect(ui.chkDbgTrace, SIGNAL(clicked(bool)), this, SLOT(OnAdvancedChanged()));
 	connect(ui.chkErrTrace, SIGNAL(clicked(bool)), this, SLOT(OnAdvancedChanged()));
 
@@ -88,6 +89,7 @@ void COptionsWindow::CreateAdvanced()
 	connect(ui.btnAddAutoExec, SIGNAL(clicked(bool)), this, SLOT(OnAddAutoExec()));
 	connect(ui.btnAddRecoveryCmd, SIGNAL(clicked(bool)), this, SLOT(OnAddRecoveryCheck()));
 	connect(ui.btnAddDeleteCmd, SIGNAL(clicked(bool)), this, SLOT(OnAddDeleteCmd()));
+	connect(ui.btnAddTerminateCmd, SIGNAL(clicked(bool)), this, SLOT(OnAddTerminateCmd()));
 	connect(ui.btnDelAuto, SIGNAL(clicked(bool)), this, SLOT(OnDelAuto()));
 	connect(ui.chkShowTriggersTmpl, SIGNAL(clicked(bool)), this, SLOT(OnShowTriggersTmpl()));
 
@@ -102,6 +104,7 @@ void COptionsWindow::CreateAdvanced()
 	connect(ui.chkShowHostProcTmpl, SIGNAL(clicked(bool)), this, SLOT(OnShowHostProcTmpl()));
 	connect(ui.chkConfidential, SIGNAL(clicked(bool)), this, SLOT(OnConfidentialChanged()));
 	connect(ui.chkLessConfidential, SIGNAL(clicked(bool)), this, SLOT(OnLessConfidentialChanged()));
+	connect(ui.chkProtectWindow, SIGNAL(clicked(bool)), this, SLOT(OnAdvancedChanged()));
 	connect(ui.chkNotifyProtect, SIGNAL(clicked(bool)), this, SLOT(OnAdvancedChanged()));
 
 	connect(ui.treeInjectDll, SIGNAL(itemChanged(QTreeWidgetItem *, int)), this, SLOT(OnToggleInjectDll(QTreeWidgetItem *, int)));
@@ -215,6 +218,7 @@ void COptionsWindow::LoadAdvanced()
 	ReadAdvancedCheck("GuiTrace", ui.chkGuiTrace, "*");
 	ReadAdvancedCheck("ClsidTrace", ui.chkComTrace, "*");
 	ReadAdvancedCheck("NetFwTrace", ui.chkNetFwTrace, "*");
+	ui.chkHookTrace->setChecked(m_pBox->GetBool("ApiTrace", false));
 	ui.chkDbgTrace->setChecked(m_pBox->GetBool("DebugTrace", false));
 	ui.chkErrTrace->setChecked(m_pBox->GetBool("ErrorTrace", false));
 
@@ -230,6 +234,8 @@ void COptionsWindow::LoadAdvanced()
 		AddTriggerItem(Value, eRecoveryCheck);
 	foreach(const QString & Value, m_pBox->GetTextList("OnBoxDelete", m_Template))
 		AddTriggerItem(Value, eDeleteCmd);
+	foreach(const QString & Value, m_pBox->GetTextList("OnBoxTerminate", m_Template))
+		AddTriggerItem(Value, eTerminateCmd);
 
 	ShowTriggersTmpl();
 	//
@@ -257,6 +263,7 @@ void COptionsWindow::LoadAdvanced()
 	ui.chkLessConfidential->setChecked(m_BoxTemplates.contains("LessConfidentialBox"));
 	ui.chkNotifyProtect->setChecked(m_pBox->GetBool("NotifyBoxProtected", false));
 
+	ui.chkProtectWindow->setChecked(m_pBox->GetBool("IsProtectScreen"));
 
 	QStringList Users = m_pBox->GetText("Enabled").split(",");
 	ui.lstUsers->clear();
@@ -297,6 +304,8 @@ void COptionsWindow::ShowTriggersTmpl(bool bUpdate)
 				AddTriggerItem(Value, eRecoveryCheck, Template);
 			foreach(const QString & Value, m_pBox->GetTextListTmpl("OnBoxDelete", Template))
 				AddTriggerItem(Value, eDeleteCmd, Template);
+			foreach(const QString & Value, m_pBox->GetTextListTmpl("OnBoxTerminate", Template))
+				AddTriggerItem(Value, eTerminateCmd, Template);
 		}
 	}
 	else if (bUpdate)
@@ -399,6 +408,7 @@ void COptionsWindow::SaveAdvanced()
 	WriteAdvancedCheck(ui.chkGuiTrace, "GuiTrace", "*");
 	WriteAdvancedCheck(ui.chkComTrace, "ClsidTrace", "*");
 	WriteAdvancedCheck(ui.chkNetFwTrace, "NetFwTrace", "*");
+	WriteAdvancedCheck(ui.chkHookTrace, "ApiTrace", "y");
 	WriteAdvancedCheck(ui.chkDbgTrace, "DebugTrace", "y");
 	WriteAdvancedCheck(ui.chkErrTrace, "ErrorTrace", "y");
 
@@ -408,6 +418,7 @@ void COptionsWindow::SaveAdvanced()
 	QStringList RecoveryCheck;
 	QStringList DeleteCommand;
 	QStringList AutoExec;
+	QStringList TerminateCommand;
 	for (int i = 0; i < ui.treeTriggers->topLevelItemCount(); i++) {
 		QTreeWidgetItem* pItem = ui.treeTriggers->topLevelItem(i);
 		switch (pItem->data(0, Qt::UserRole).toInt())
@@ -417,6 +428,7 @@ void COptionsWindow::SaveAdvanced()
 		case eAutoExec:		AutoExec.append(pItem->text(2)); break;
 		case eRecoveryCheck:		RecoveryCheck.append(pItem->text(2)); break;
 		case eDeleteCmd:	DeleteCommand.append(pItem->text(2)); break;
+		case eTerminateCmd:		TerminateCommand.append(pItem->text(2)); break;
 		}
 	}
 	WriteTextList("StartProgram", StartProgram);
@@ -424,6 +436,7 @@ void COptionsWindow::SaveAdvanced()
 	WriteTextList("AutoExec", AutoExec);
 	WriteTextList("OnFileRecovery", RecoveryCheck);
 	WriteTextList("OnBoxDelete", DeleteCommand);
+	WriteTextList("OnBoxTerminate", TerminateCommand);
 	//
 
 
@@ -453,6 +466,8 @@ void COptionsWindow::SaveAdvanced()
 
 	WriteAdvancedCheck(ui.chkConfidential, "ConfidentialBox", "y", "");
 	WriteAdvancedCheck(ui.chkNotifyProtect, "NotifyBoxProtected", "y", "");
+
+	WriteAdvancedCheck(ui.chkProtectWindow, "IsProtectScreen", "y", "n");
 
 	QStringList Users;
 	for (int i = 0; i < ui.lstUsers->count(); i++)
@@ -871,6 +886,9 @@ void COptionsWindow::AddTriggerItem(const QString& Value, ETriggerAction Type, c
 			pItem->setText(0, tr("On Delete Content"));
 			pItem->setText(1, tr("Run Command"));
 			break;
+		case eTerminateCmd:
+			pItem->setText(0, tr("On Terminate"));
+			pItem->setText(1, tr("Run Command"));
 	}
 	pItem->setText(2, Value);
 	pItem->setFlags(pItem->flags() | Qt::ItemIsEditable);
@@ -917,6 +935,17 @@ void COptionsWindow::OnAddDeleteCmd()
 		return;
 
 	AddTriggerItem(Value, eDeleteCmd);
+	m_AdvancedChanged = true;
+	OnOptChanged();
+}
+
+void COptionsWindow::OnAddTerminateCmd()
+{
+	QString Value = QInputDialog::getText(this, "Sandboxie-Plus", tr("Please enter the command line to be executed"), QLineEdit::Normal);
+	if (Value.isEmpty())
+		return;
+
+	AddTriggerItem(Value, eTerminateCmd);
 	m_AdvancedChanged = true;
 	OnOptChanged();
 }
